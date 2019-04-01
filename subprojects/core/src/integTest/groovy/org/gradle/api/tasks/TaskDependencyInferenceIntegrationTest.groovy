@@ -537,6 +537,27 @@ The following types/formats are supported:
         "layout.buildDirectory.file(provider {'../in.txt' })" | _
     }
 
+    def "input property with value of mapped task output implies dependency on the task"() {
+        taskTypeWithOutputFileProperty()
+        taskTypeWithInputProperty()
+        buildFile << """
+            def task = tasks.create("a", OutputFileTask) {
+                outFile = file("file.txt")
+            }
+            tasks.register("b", InputTask) {
+                inValue = task.outFile.map { it.asFile.text as Integer }
+                outFile = file("out.txt")
+            }
+        """
+
+        when:
+        run("b")
+
+        then:
+        result.assertTasksExecuted(":a", ":b")
+        file("out.txt").text == "1"
+    }
+
     def taskTypeWithOutputFileProperty() {
         buildFile << """
             class OutputFileTask extends DefaultTask {
@@ -578,6 +599,21 @@ The following types/formats are supported:
                 def go() {
                     out1.get().asFile.text = "1"
                     out2.get().asFile.text = "2"
+                }
+            }
+        """
+    }
+
+    def taskTypeWithInputProperty() {
+        buildFile << """
+            class InputTask extends DefaultTask {
+                @Input
+                final Property<Integer> inValue = project.objects.property(Integer)
+                @OutputFile
+                final RegularFileProperty outFile = project.objects.fileProperty()
+                @TaskAction
+                def go() {
+                    outFile.get().asFile.text = inValue.get().toString()
                 }
             }
         """

@@ -25,6 +25,7 @@ import org.gradle.api.internal.TaskInternal;
 import org.gradle.api.internal.file.CompositeFileCollection;
 import org.gradle.api.internal.file.FileCollectionFactory;
 import org.gradle.api.internal.file.collections.FileCollectionResolveContext;
+import org.gradle.api.internal.provider.ProviderInternal;
 import org.gradle.api.internal.tasks.properties.FileParameterUtils;
 import org.gradle.api.internal.tasks.properties.GetInputFilesVisitor;
 import org.gradle.api.internal.tasks.properties.GetInputPropertiesVisitor;
@@ -32,6 +33,7 @@ import org.gradle.api.internal.tasks.properties.InputFilePropertyType;
 import org.gradle.api.internal.tasks.properties.PropertyValue;
 import org.gradle.api.internal.tasks.properties.PropertyVisitor;
 import org.gradle.api.internal.tasks.properties.PropertyWalker;
+import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.FileNormalizer;
 import org.gradle.api.tasks.TaskInputPropertyBuilder;
 import org.gradle.api.tasks.TaskInputs;
@@ -212,6 +214,20 @@ public class DefaultTaskInputs implements TaskInputsInternal {
         @Override
         public void visitContents(final FileCollectionResolveContext context) {
             TaskPropertyUtils.visitProperties(propertyWalker, task, new PropertyVisitor.Adapter() {
+                @Override
+                public void visitInputProperty(String propertyName, PropertyValue value, boolean optional) {
+                    final Object unpacked = value.call();
+                    if (unpacked instanceof ProviderInternal) {
+                        System.out.println("-> provider!!");
+                        context.add(new TaskDependencyContainer() {
+                            @Override
+                            public void visitDependencies(TaskDependencyResolveContext context) {
+                                ((ProviderInternal) unpacked).visitDependencies(context);
+                            }
+                        });
+                    }
+                }
+
                 @Override
                 public void visitInputFileProperty(final String propertyName, boolean optional, boolean skipWhenEmpty, boolean incremental, @Nullable Class<? extends FileNormalizer> fileNormalizer, PropertyValue value, InputFilePropertyType filePropertyType) {
                     if (!TaskInputUnionFileCollection.this.skipWhenEmptyOnly || skipWhenEmpty) {
